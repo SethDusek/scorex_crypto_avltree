@@ -1,7 +1,5 @@
 use anyhow::*;
-use blake2::digest::{Update, VariableOutput};
-use blake2::VarBlake2b;
-use sha2::{Sha256,Digest};
+use blake2::digest::Digest as _;
 use bytes::Bytes;
 use rand::prelude::*;
 use scorex_crypto_avltree::authenticated_tree_ops::*;
@@ -10,8 +8,8 @@ use scorex_crypto_avltree::batch_avl_verifier::*;
 use scorex_crypto_avltree::batch_node::*;
 use scorex_crypto_avltree::operation::*;
 use scorex_crypto_avltree::versioned_avl_storage::*;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::io::Write;
 
 pub const INITIAL_TREE_SIZE: usize = 1000;
 pub const KEY_LENGTH: usize = 32;
@@ -52,9 +50,9 @@ pub fn random_kv_list(max_size: usize) -> Vec<KeyValue> {
 pub fn generate_kv_list(size: usize) -> Vec<KeyValue> {
     (0..size)
         .map(|i| {
-            let mut hasher = VarBlake2b::new(KEY_LENGTH).unwrap();
+            let mut hasher = Blake2b256::new();
             hasher.update(&i.to_string());
-            let key = Bytes::copy_from_slice(&hasher.finalize_boxed());
+            let key = Bytes::copy_from_slice(&hasher.finalize());
             let value = key.clone();
             KeyValue { key, value }
         })
@@ -101,9 +99,9 @@ pub fn generate_and_populate_prover(size: usize) -> (BatchAVLProver, Vec<KeyValu
     let mut prover = generate_prover(KEY_LENGTH, None);
     let mut initial_elements: Vec<KeyValue> = Vec::new();
     for i in 0..size {
-        let mut hasher = VarBlake2b::new(KEY_LENGTH).unwrap();
+        let mut hasher = Blake2b256::new();
         hasher.update(&i.to_string());
-        let key = Bytes::copy_from_slice(&hasher.finalize_boxed());
+        let key = Bytes::copy_from_slice(&hasher.finalize());
         let value = Bytes::from(i.to_string());
         let kv = KeyValue { key, value };
         initial_elements.push(kv.clone());
@@ -221,6 +219,6 @@ impl Iterator for RollbackVersionIterator {
 
 pub fn sha256(data: &str) -> Bytes {
     let mut hasher = Sha256::new();
-    hasher.write(data.as_bytes()).unwrap();
-	Bytes::copy_from_slice(&hasher.finalize())
+    hasher.update(data);
+    Bytes::copy_from_slice(&hasher.finalize())
 }
